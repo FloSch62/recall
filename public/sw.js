@@ -1,4 +1,4 @@
-const CACHE_NAME = 'recall-v1'
+const CACHE_NAME = 'recall-v2'
 const BASE_URL = self.registration.scope
 const APP_SHELL_URL = new URL('index.html', BASE_URL).toString()
 
