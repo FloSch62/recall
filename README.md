@@ -4,7 +4,7 @@
 
 ### ▶️ [Open Recall](https://flosch62.github.io/recall/)
 
-No account, no install. Your study progress and imported decks are stored in your browser and never leave your device.
+No account or install required. On Android Chrome, you can install Recall from the browser menu for a standalone app experience; your study progress and imported decks are stored in your browser and never leave your device.
 
 <p align="center">
   <img src="docs/screenshots/study.png" alt="Studying a question with a network topology exhibit" width="760">

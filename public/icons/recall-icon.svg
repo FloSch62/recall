@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Recall app icon</title>
+  <desc id="desc">A study card with a check mark and spark on a blue background.</desc>
+  <defs>
+    <linearGradient id="bg" x1="80" x2="432" y1="64" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4756c4" />
+      <stop offset="1" stop-color="#00796b" />
+    </linearGradient>
+    <filter id="shadow" x="80" y="88" width="352" height="352" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#162033" flood-opacity=".28" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <path fill="#ffffff" fill-opacity=".18" d="M391 86c23 9 42 26 53 48l-56 24-30-64c11-5 22-8 33-8ZM78 348l76 86c-19-7-36-20-49-37-11-15-21-31-27-49Z" />
+  <g filter="url(#shadow)">
+    <rect x="128" y="116" width="256" height="280" rx="36" fill="#fff" />
+    <rect x="162" y="166" width="132" height="18" rx="9" fill="#4756c4" opacity=".88" />
+    <rect x="162" y="210" width="188" height="18" rx="9" fill="#d9deef" />
+    <rect x="162" y="248" width="136" height="18" rx="9" fill="#d9deef" />
+    <path fill="#00796b" d="m231 340-54-54 27-27 27 27 86-86 27 27-113 113Z" />
+  </g>
+  <path fill="#ffb74d" d="m360 108 14 31 31 14-31 14-14 31-14-31-31-14 31-14 14-31Z" />
+</svg>

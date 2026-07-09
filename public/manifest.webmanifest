@@ -1,0 +1,41 @@
+{
+  "id": "/recall/",
+  "name": "Recall Study Decks",
+  "short_name": "Recall",
+  "description": "Study markdown decks with spaced repetition, practice mode, quests and local progress.",
+  "start_url": "/recall/",
+  "scope": "/recall/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "theme_color": "#4756c4",
+  "background_color": "#f4f6fb",
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
