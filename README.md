@@ -1,69 +1,62 @@
-# Recall — markdown-fed spaced-repetition study app
+# Recall
 
-An Anki-style learning app (React + Vite + MUI, pnpm) that turns markdown question
-files into study decks. Decks are plain `questions.md` files — bundle them with the
-app under `public/decks/`, or **import them at runtime**: paste markdown, load a
-local file, or fetch from a GitHub repo / any URL.
+**Turn markdown files into study decks — spaced repetition, multiple choice, and network-diagram exhibits, right in your browser.**
 
-## Features
+### ▶️ [Open Recall](https://flosch62.github.io/recall/)
 
-- **Spaced repetition** (Anki-style SM-2): Again / Hard / Good / Easy with interval
-  previews, learning steps (1m → 10m → 1d), lapses, daily new/review limits, undo.
-- **Multiple choice** answering with instant feedback and explanations; accuracy is
-  tracked separately from the schedule.
-- **Deck import**: paste/upload a `questions.md`, or import from a GitHub link
-  (repo, folder or file) or a direct URL. Imported decks are stored in the browser
-  (IndexedDB) and can be updated from their source or removed at any time.
-- **Exhibits**: fenced ```` ```cli ```` blocks render as terminal output; fenced
-  ```` ```topology ```` blocks (JSON DSL) render as auto-laid-out network diagrams
-  (React Flow) with spines/leaves/servers, LAG/eBGP links, AS groups and callouts.
-- **Practice (cram) mode**: filter by module, shuffle, "weakest first", retry-wrong —
-  never touches the review schedule.
-- **Browse**: full-text search, module/state filters, per-card scheduling details.
-- **Stats**: streak, reviews/day (30d), due forecast (14d), card states, per-module table.
-- **Import/Export** of all progress as JSON (merge for multi-device sync, or replace).
-- Dark/light/system theme, responsive desktop + phone layout, keyboard shortcuts
-  (`A–D`/`1–4` answer · `Space` reveal/confirm · `1–4` grade · `U` undo).
+No account, no install. Your study progress and imported decks are stored in your browser and never leave your device.
 
-Progress is stored in `localStorage`, imported decks in IndexedDB — both stay on
-the device. Export progress regularly or before clearing browser data.
+<p align="center">
+  <img src="docs/screenshots/study.png" alt="Studying a question with a network topology exhibit" width="760">
+</p>
 
-## Development
+## What you can do
 
-```sh
-pnpm install
-pnpm dev        # parses decks, serves on :5173
-pnpm build      # typecheck + production build into dist/
-pnpm decks      # re-parse decks only (run after editing questions.md)
-```
+- **Study with spaced repetition** — Anki-style scheduling (Again / Hard / Good / Easy) decides when each question comes back, so you spend time on the cards you actually forget.
+- **Answer real multiple-choice questions** — pick an option, get instant feedback and an explanation. Accuracy is tracked separately from the schedule.
+- **See exhibits like in the real exam** — questions can include terminal output and auto-drawn network topology diagrams (spines, leaves, servers, LAG/eBGP links…).
+- **Practice without pressure** — cram mode with module filters, shuffle, "weakest first" and retry-wrong never touches your review schedule.
+- **Browse and search** every question with module/state filters and per-card scheduling details.
+- **Keep your streak** — stats show reviews per day, a due forecast, card states and per-module accuracy.
 
-Requires Node ≥ 22.18 (the build script imports the TypeScript deck parser
-directly via type stripping).
+<p align="center">
+  <img src="docs/screenshots/home.png" alt="Deck overview" width="760">
+</p>
 
-## Importing decks
+## Bring your own decks
 
-**Decks → Import deck** in the app offers three ways in:
+Recall ships with a small example deck. The interesting part is importing your own — **Decks → Import deck**:
 
-1. **Paste / file** — paste `questions.md` content or load a local `.md`/`.json` file.
-2. **GitHub** — a repository, folder or file link, e.g.
-   `https://github.com/user/repo`,
-   `https://github.com/user/repo/tree/main/decks/my-deck` or
-   `https://github.com/user/repo/blob/main/decks/my-deck/questions.md`.
-   Repo/folder links are searched for `questions.md` (or a compiled `deck.json`);
-   the default branch is resolved via the GitHub API.
-3. **URL** — a direct link to a `questions.md` or `deck.json`. The server must send
-   CORS headers (raw.githubusercontent.com and most static hosts do).
+| Method | How |
+|---|---|
+| 📋 **Paste / file** | Paste `questions.md` content or load a local `.md` / `.json` file |
+| 🐙 **GitHub** | Paste a link to a repo, folder or file — e.g. `https://github.com/user/repo/tree/main/decks/my-deck`. Recall finds the `questions.md` on the default branch |
+| 🔗 **URL** | Any direct link to a `questions.md` or compiled `deck.json` (the server must allow CORS — raw.githubusercontent.com and most static hosts do) |
 
-Study progress is keyed by deck ID + question ID, so re-importing or updating a
-deck with the same ID keeps your progress. Image exhibits in imported decks are
-resolved relative to the source URL (pasted decks can't show relative images).
+<p align="center">
+  <img src="docs/screenshots/import.png" alt="Import page" width="760">
+</p>
 
-## Writing a deck
+Good to know:
 
-Bundled decks live in `public/decks/<deck-id>/questions.md` (compiled by
-`pnpm decks`); imported decks use the exact same format. See
-[`public/decks/networking-basics/questions.md`](public/decks/networking-basics/questions.md)
-for a working example.
+- Imported decks live in your browser (IndexedDB). You can **update them from their source** or remove them on the deck page.
+- Progress is keyed by deck ID + question ID — re-importing or updating a deck with the same ID **keeps your study progress**.
+- Image exhibits are loaded relative to the source URL, so decks imported from GitHub/URL can include images.
+
+## Track your progress
+
+Every answer feeds your statistics: streak, reviews per day, a 14-day due forecast and how many cards you've mastered. Back up or sync between devices with **Settings → Export / Import progress** (merge-aware, safe for two devices).
+
+<p align="center">
+  <img src="docs/screenshots/stats.png" alt="Statistics page" width="760">
+</p>
+
+Keyboard shortcuts while studying: `A–D` / `1–4` answer · `Space` reveal/confirm · `1–4` grade · `U` undo.
+
+## Write your own deck
+
+A deck is one markdown file. Titles become modules, `**Q1.1**`-style questions become cards — the bundled
+[example deck](public/decks/networking-basics/questions.md) shows everything, including exhibits:
 
 ```markdown
 # Deck title
@@ -72,63 +65,52 @@ Intro paragraph → becomes the deck description.
 
 ## Module 1 — First module title
 
-### Optional page / context heading shown above each question
+### Optional context heading shown above each question
 
-**Q1.1** Question text? Say "Consider the exhibit." when using one:
+**Q1.1** Which statement about UDP is correct?
 
-    ```cli
-    A:leaf1# show network-instance summary
-    ```
-
-    ```topology
-    { "nodes": [ { "id": "leaf1", "kind": "leaf" } ], "links": [] }
-    ```
-
-- A. First option.
-- B. Second option.
-- C. Third option.
-- D. Fourth option.
+- A. It retransmits lost datagrams after a timeout.
+- B. It establishes a connection with a three-way handshake.
+- C. It provides no delivery guarantee and no flow control.
+- D. It guarantees in-order delivery using sequence numbers.
 
 <details><summary>Answer</summary>
 
-**A** — Explanation for the answer.
+**C** — UDP is connectionless and best-effort: no handshake, no
+acknowledgements, no retransmission, no ordering.
 
 </details>
 ```
 
-(In a real file the exhibit fences are not indented — they sit at column 0 inside
-the question body.) Topology JSON: `nodes` (`kind`: cloud/superspine/spine/leaf/
-server/host/router/vm, optional `label`, `as`, `notes`, `tier`), `links`
-(`from`/`to`, optional `label`, `fromEnd`/`toEnd`, `kind`: link/ebgp/lag/tunnel/down),
-`groups` (AS boxes) and `callouts`. `![Exhibit](images/x.png)` images work too.
+Exhibits go inside the question body as fenced code blocks:
 
-The parser warns about malformed questions (missing answer, answer not among
-options, …) at build time and on the import preview. Raw `<tokens>` in text are
-fine — everything is HTML-escaped before markdown rendering.
+- ` ```cli ` — rendered as terminal output
+- ` ```topology ` — a small JSON DSL rendered as a network diagram: `nodes`
+  (`kind`: cloud/superspine/spine/leaf/server/host/router/vm, optional `label`, `as`, `notes`),
+  `links` (`from`/`to`, optional `label`, `fromEnd`/`toEnd`, `kind`: link/ebgp/lag/tunnel/down),
+  `groups` (AS boxes) and `callouts`
+- `![Exhibit](images/x.png)` — images, resolved relative to the deck's source URL
 
-## Deploying to GitHub Pages
+Write "Consider the exhibit." in the question text when it has one — the parser warns you if they don't match, both at build time and in the import preview. Raw `<tokens>` in text are fine; everything is HTML-escaped before rendering.
 
-`.github/workflows/deploy.yml` builds and publishes `dist/` on every push to
-`main`. One-time setup: repository **Settings → Pages → Source: GitHub Actions**.
-The site lands at `https://<user>.github.io/recall/`.
+## Development
 
-Notes:
+React 19 + Vite + MUI 7, decks compiled by a small build script (Node ≥ 22.18 — it imports the TypeScript parser via type stripping, the same parser the browser uses for imports).
 
-- `vite.config.ts` sets `base: '/recall/'` (the project-site subpath) and the
-  router derives its basename from it. If you rename the repo or use a custom
-  domain, adjust `base` accordingly (`'/'` for a custom domain or user site).
-- GitHub Pages has no server-side rewrites, so the build copies `index.html` to
-  `404.html` (postbuild script) — deep links like `/recall/deck/x` boot the SPA
-  via the 404 page.
-- GitHub Pages sites are public (private Pages needs GitHub Enterprise Cloud).
-  Study progress and imported decks stay in the visitor's browser either way.
+```sh
+pnpm install
+pnpm dev        # parses decks, serves on :5173
+pnpm build      # typecheck + production build into dist/
+pnpm decks      # re-parse decks only (run after editing questions.md)
+```
 
-## Repo layout
+Bundled decks live in `public/decks/<deck-id>/questions.md`; drop in a folder and re-run `pnpm decks`.
 
 ```
-├── .github/workflows/        # GitHub Pages deploy on push to main
+├── .github/workflows/        # deploys dist/ on push to main
 ├── scripts/build-decks.mjs   # questions.md → deck.json + index.json (runs pre-dev/build)
-├── public/decks/<deck-id>/   # bundled deck sources (questions.md [+ images])
+├── public/decks/<deck-id>/   # bundled deck sources
+├── docs/screenshots/         # README images
 └── src/
     ├── lib/                  # deck parser, imported-deck store (IndexedDB), srs
     │                         # scheduler, session queue, progress store, stats
