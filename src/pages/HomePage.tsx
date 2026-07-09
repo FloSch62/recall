@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Container from '@mui/material/Container'
 import Grid from '@mui/material/Grid'
 import Stack from '@mui/material/Stack'
@@ -8,17 +9,22 @@ import CardActions from '@mui/material/CardActions'
 import CardContent from '@mui/material/CardContent'
 import Chip from '@mui/material/Chip'
 import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
+import Snackbar from '@mui/material/Snackbar'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import AddIcon from '@mui/icons-material/Add'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { useNavigate } from 'react-router-dom'
 import type { DeckSummary } from '../lib/types'
 import { useDeckIndex } from '../lib/decks'
+import { deleteImportedDeck } from '../lib/importedDecks'
 import { useProgress, type ProgressData } from '../lib/store'
 import { homeDeckCounts } from '../lib/stats'
 import { stripHtml } from '../lib/format'
-import { ErrorState, Loading } from '../components/Feedback'
+import { ConfirmDialog, ErrorState, Loading } from '../components/Feedback'
 
 const clamp2 = {
   display: '-webkit-box',
@@ -27,7 +33,17 @@ const clamp2 = {
   overflow: 'hidden',
 } as const
 
-function DeckSummaryCard({ summary, data, now }: { summary: DeckSummary; data: ProgressData; now: number }) {
+function DeckSummaryCard({
+  summary,
+  data,
+  now,
+  onRemove,
+}: {
+  summary: DeckSummary
+  data: ProgressData
+  now: number
+  onRemove: (summary: DeckSummary) => void
+}) {
   const navigate = useNavigate()
   const c = homeDeckCounts(summary.id, summary.cardCount, data, now)
   const due = c.dueReviews + c.dueLearning
@@ -57,7 +73,7 @@ function DeckSummaryCard({ summary, data, now }: { summary: DeckSummary; data: P
           </Typography>
         </CardContent>
       </CardActionArea>
-      <CardActions sx={{ px: 2, pb: 2 }}>
+      <CardActions sx={{ px: 2, pb: 2, flexWrap: 'wrap', gap: 0.5 }}>
         <Button
           variant="contained"
           size="small"
@@ -72,6 +88,14 @@ function DeckSummaryCard({ summary, data, now }: { summary: DeckSummary; data: P
         <Button size="small" onClick={() => navigate(`/deck/${summary.id}/browse`)}>
           Browse
         </Button>
+        <Box sx={{ flex: 1 }} />
+        {summary.origin === 'imported' && (
+          <Tooltip title="Remove deck">
+            <IconButton size="small" color="error" aria-label={`remove ${summary.title}`} onClick={() => onRemove(summary)}>
+              <DeleteOutlineIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </CardActions>
     </Card>
   )
@@ -81,7 +105,18 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { index, error } = useDeckIndex()
   const data = useProgress()
+  const [removeTarget, setRemoveTarget] = useState<DeckSummary | null>(null)
+  const [snack, setSnack] = useState<string | null>(null)
   const now = Date.now()
+
+  const removeDeck = async (summary: DeckSummary) => {
+    try {
+      await deleteImportedDeck(summary.id)
+      setSnack(`Removed "${summary.title}".`)
+    } catch (e) {
+      setSnack(e instanceof Error ? e.message : 'Could not remove the deck.')
+    }
+  }
 
   if (error) return <ErrorState message={error} />
   if (!index) return <Loading />
@@ -106,7 +141,7 @@ export default function HomePage() {
       <Grid container spacing={2}>
         {index.decks.map((d) => (
           <Grid key={d.id} size={{ xs: 12, sm: 6, md: 4 }}>
-            <DeckSummaryCard summary={d} data={data} now={now} />
+            <DeckSummaryCard summary={d} data={data} now={now} onRemove={setRemoveTarget} />
           </Grid>
         ))}
       </Grid>
@@ -115,6 +150,23 @@ export default function HomePage() {
           No decks yet. Import one (markdown, GitHub or URL) or add a folder with a questions.md under public/decks/.
         </Typography>
       )}
+      <ConfirmDialog
+        open={!!removeTarget}
+        title="Remove this deck?"
+        message={`This removes the imported deck "${removeTarget?.title ?? ''}" from this browser. Study progress is kept — import the deck again with the same ID to continue where you left off.`}
+        confirmLabel="Remove deck"
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={() => {
+          if (removeTarget) void removeDeck(removeTarget)
+        }}
+      />
+      <Snackbar
+        open={!!snack}
+        autoHideDuration={4000}
+        onClose={() => setSnack(null)}
+        message={snack ?? ''}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Container>
   )
 }
