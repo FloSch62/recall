@@ -9,7 +9,8 @@
     "dev": "vite",
     "prebuild": "node scripts/build-decks.mjs",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postbuild": "cp dist/index.html dist/404.html"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -106,46 +106,27 @@ The parser warns about malformed questions (missing answer, answer not among
 options, …) at build time and on the import preview. Raw `<tokens>` in text are
 fine — everything is HTML-escaped before markdown rendering.
 
-## Deploying to Cloudflare Pages (private, with auth)
+## Deploying to GitHub Pages
 
-Deploy with direct upload from CI (or your machine):
+`.github/workflows/deploy.yml` builds and publishes `dist/` on every push to
+`main`. One-time setup: repository **Settings → Pages → Source: GitHub Actions**.
+The site lands at `https://<user>.github.io/recall/`.
 
-```sh
-pnpm build
-npx wrangler pages deploy dist --project-name recall
-```
+Notes:
 
-GitHub Actions example:
-
-```yaml
-on: { push: { branches: [main] } }
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 24, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: npx wrangler pages deploy dist --project-name recall
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-```
-
-**Auth:** protect the Pages project with **Cloudflare Access** (Zero Trust →
-Access → Applications → add the `*.pages.dev` domain / your custom domain, then a
-policy such as "email is you@example.com" with One-Time PIN or Google login). No
-app changes needed. Also disable the public `*.pages.dev` preview URLs or include
-them in the Access application.
-
-`public/_redirects` already contains the SPA fallback (`/* /index.html 200`).
+- `vite.config.ts` sets `base: '/recall/'` (the project-site subpath) and the
+  router derives its basename from it. If you rename the repo or use a custom
+  domain, adjust `base` accordingly (`'/'` for a custom domain or user site).
+- GitHub Pages has no server-side rewrites, so the build copies `index.html` to
+  `404.html` (postbuild script) — deep links like `/recall/deck/x` boot the SPA
+  via the 404 page.
+- GitHub Pages sites are public (private Pages needs GitHub Enterprise Cloud).
+  Study progress and imported decks stay in the visitor's browser either way.
 
 ## Repo layout
 
 ```
+├── .github/workflows/        # GitHub Pages deploy on push to main
 ├── scripts/build-decks.mjs   # questions.md → deck.json + index.json (runs pre-dev/build)
 ├── public/decks/<deck-id>/   # bundled deck sources (questions.md [+ images])
 └── src/
