@@ -10,6 +10,7 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import ShuffleIcon from '@mui/icons-material/Shuffle'
 import SearchIcon from '@mui/icons-material/Search'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -111,6 +112,18 @@ export default function DeckPage() {
           onClick={() => navigate(`/deck/${deckId}/study`)}
         >
           Study{est > 0 ? ` (${est})` : ''}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<RocketLaunchIcon />}
+          onClick={() => navigate(`/deck/${deckId}/quest`)}
+          sx={{
+            color: '#58cc02',
+            borderColor: '#58cc02',
+            '&:hover': { borderColor: '#46a302', bgcolor: 'rgba(88, 204, 2, 0.08)' },
+          }}
+        >
+          Quest
         </Button>
         <Button variant="outlined" startIcon={<ShuffleIcon />} onClick={() => navigate(`/deck/${deckId}/practice`)}>
           Practice
