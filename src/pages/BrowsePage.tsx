@@ -211,7 +211,7 @@ export default function BrowsePage() {
                       p && p.st !== 'new'
                         ? `due ${formatDueIn(p.due, now)} · ${p.seen ? `accuracy ${formatPercent(p.correct, p.seen)}` : 'not answered yet'}`
                         : p?.seen
-                          ? `practiced · accuracy ${formatPercent(p.correct, p.seen)}`
+                          ? `answered · accuracy ${formatPercent(p.correct, p.seen)}`
                           : undefined
                     }
                   />

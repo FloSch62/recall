@@ -23,7 +23,9 @@ import StarRoundedIcon from '@mui/icons-material/StarRounded'
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import VolumeUpIcon from '@mui/icons-material/VolumeUp'
 import VolumeOffIcon from '@mui/icons-material/VolumeOff'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { useDeck } from '../lib/decks'
+import { useProgress } from '../lib/store'
 import {
   DAILY_GOAL_XP,
   bestStreak,
@@ -39,6 +41,7 @@ import {
   xpToday,
   type DayXp,
 } from '../lib/quest'
+import { deckCounts, sessionEstimate } from '../lib/stats'
 import { sfx } from '../lib/sounds'
 import Confetti from '../components/Confetti'
 import Ring from '../components/Ring'
@@ -287,6 +290,7 @@ export default function QuestPage() {
   const { deck, error } = useDeck(deckId)
   const navigate = useNavigate()
   const data = useQuest()
+  const progress = useProgress()
   const [lockedOpen, setLockedOpen] = useState(false)
   const [celebrate, setCelebrate] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
@@ -318,6 +322,9 @@ export default function QuestPage() {
   const goalMet = xpT >= DAILY_GOAL_XP
   const totals = deckQuestTotals(data, deckId, flat)
   const week = lastDaysXp(data, now, 7)
+  const srsCounts = deckCounts(deck, progress, now)
+  const srsDue = srsCounts.dueReviews + srsCounts.dueLearning
+  const srsEstimate = sessionEstimate(srsCounts, progress, deckId, now)
 
   // global node index per unit so the snake continues across unit banners
   const unitStart: number[] = []
@@ -431,7 +438,21 @@ export default function QuestPage() {
               <Grid size={{ xs: 6, sm: 3 }}>
                 <StatTile value={`${bestStreak(data)}d`} label="Best streak" />
               </Grid>
+              <Grid size={{ xs: 6, sm: 3 }}>
+                <StatTile value={`${srsDue}`} label="SRS due" />
+              </Grid>
             </Grid>
+            {srsDue > 0 && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => navigate(`/deck/${deckId}/study`)}
+                sx={{ mt: 1.5 }}
+              >
+                Study{srsEstimate > 0 ? ` (${srsEstimate})` : ''}
+              </Button>
+            )}
           </CardContent>
         </Card>
       </Collapse>

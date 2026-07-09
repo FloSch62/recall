@@ -4,6 +4,8 @@ import { endOfToday, todayKey, MATURE_IVL } from './srs'
 
 export interface DeckCounts {
   total: number
+  /** unique cards with at least one multiple-choice answer in any mode */
+  answered: number
   /** cards that entered the SRS (state != new) */
   started: number
   newRemaining: number
@@ -17,6 +19,7 @@ export interface DeckCounts {
 
 const zero = (total: number): DeckCounts => ({
   total,
+  answered: 0,
   started: 0,
   newRemaining: total,
   learning: 0,
@@ -34,6 +37,7 @@ export function homeDeckCounts(deckId: string, cardCount: number, data: Progress
   const eod = endOfToday(now)
   for (const [key, p] of Object.entries(data.cards)) {
     if (!key.startsWith(prefix)) continue
+    if (p.seen > 0) c.answered++
     c.seen += p.seen
     c.correct += p.correct
     if (p.st === 'new') continue
@@ -46,6 +50,7 @@ export function homeDeckCounts(deckId: string, cardCount: number, data: Progress
       if (p.ivl >= MATURE_IVL) c.mature++
     }
   }
+  c.answered = Math.min(cardCount, c.answered)
   c.newRemaining = Math.max(0, cardCount - c.started)
   return c
 }
@@ -58,6 +63,7 @@ export function deckCounts(deck: Deck, data: ProgressData, now: number): DeckCou
   for (const card of deck.cards) {
     const p = data.cards[cardKey(deck.id, card.id)]
     if (!p) continue
+    if (p.seen > 0) c.answered++
     c.seen += p.seen
     c.correct += p.correct
     if (p.st === 'new') continue
@@ -77,6 +83,7 @@ export function deckCounts(deck: Deck, data: ProgressData, now: number): DeckCou
 
 export interface ModuleCounts {
   total: number
+  answered: number
   started: number
   mature: number
   seen: number
@@ -84,13 +91,14 @@ export interface ModuleCounts {
 }
 
 export function moduleCounts(deck: Deck, data: ProgressData): ModuleCounts[] {
-  const out: ModuleCounts[] = deck.modules.map(() => ({ total: 0, started: 0, mature: 0, seen: 0, correct: 0 }))
+  const out: ModuleCounts[] = deck.modules.map(() => ({ total: 0, answered: 0, started: 0, mature: 0, seen: 0, correct: 0 }))
   for (const card of deck.cards) {
     const m = out[card.module]
     if (!m) continue
     m.total++
     const p = data.cards[cardKey(deck.id, card.id)]
     if (!p) continue
+    if (p.seen > 0) m.answered++
     m.seen += p.seen
     m.correct += p.correct
     if (p.st === 'new') continue

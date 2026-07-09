@@ -15,6 +15,7 @@ import Snackbar from '@mui/material/Snackbar'
 import Typography from '@mui/material/Typography'
 import LinearProgress from '@mui/material/LinearProgress'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import { useNavigate } from 'react-router-dom'
@@ -48,9 +49,30 @@ function DeckSummaryCard({
   const c = homeDeckCounts(summary.id, summary.cardCount, data, now)
   const due = c.dueReviews + c.dueLearning
   return (
-    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {summary.origin === 'imported' && (
+        <Tooltip title="Remove deck">
+          <IconButton
+            size="small"
+            color="error"
+            aria-label={`remove ${summary.title}`}
+            onClick={() => onRemove(summary)}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+              bgcolor: 'background.paper',
+              boxShadow: 1,
+              '&:hover': { bgcolor: 'background.paper' },
+            }}
+          >
+            <DeleteOutlineIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )}
       <CardActionArea onClick={() => navigate(`/deck/${summary.id}`)} sx={{ flex: 1 }}>
-        <CardContent>
+        <CardContent sx={{ pr: summary.origin === 'imported' ? 6 : undefined }}>
           <Typography variant="subtitle1" fontWeight={700} sx={clamp2}>
             {summary.title}
           </Typography>
@@ -65,11 +87,11 @@ function DeckSummaryCard({
           </Stack>
           <LinearProgress
             variant="determinate"
-            value={c.total ? (c.started / c.total) * 100 : 0}
+            value={c.total ? (c.answered / c.total) * 100 : 0}
             sx={{ height: 6, borderRadius: 3, mb: 0.75 }}
           />
           <Typography variant="caption" color="text.secondary">
-            {c.started}/{summary.cardCount} started · {c.mature} mastered
+            {c.answered}/{summary.cardCount} answered · {c.mature} mastered
           </Typography>
         </CardContent>
       </CardActionArea>
@@ -82,20 +104,20 @@ function DeckSummaryCard({
         >
           Study
         </Button>
+        <Button
+          size="small"
+          startIcon={<RocketLaunchIcon />}
+          onClick={() => navigate(`/deck/${summary.id}/quest`)}
+          sx={{ color: '#58cc02' }}
+        >
+          Quest
+        </Button>
         <Button size="small" onClick={() => navigate(`/deck/${summary.id}/practice`)}>
           Practice
         </Button>
         <Button size="small" onClick={() => navigate(`/deck/${summary.id}/browse`)}>
           Browse
         </Button>
-        <Box sx={{ flex: 1 }} />
-        {summary.origin === 'imported' && (
-          <Tooltip title="Remove deck">
-            <IconButton size="small" color="error" aria-label={`remove ${summary.title}`} onClick={() => onRemove(summary)}>
-              <DeleteOutlineIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
       </CardActions>
     </Card>
   )
@@ -121,18 +143,10 @@ export default function HomePage() {
   if (error) return <ErrorState message={error} />
   if (!index) return <Loading />
 
-  const totalDue = index.decks.reduce((acc, d) => {
-    const c = homeDeckCounts(d.id, d.cardCount, data, now)
-    return acc + c.dueReviews + c.dueLearning
-  }, 0)
-
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Stack direction="row" alignItems="baseline" spacing={2} sx={{ mb: 2, flexWrap: 'wrap' }}>
         <Typography variant="h5">Decks</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {totalDue > 0 ? `${totalDue} card${totalDue === 1 ? '' : 's'} due today` : 'All caught up 🎉'}
-        </Typography>
         <Box sx={{ flex: 1 }} />
         <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => navigate('/import')}>
           Import deck

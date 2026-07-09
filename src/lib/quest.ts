@@ -106,20 +106,54 @@ export interface QuestData {
 
 const STORAGE_KEY = 'recall:quest:v1'
 
-function emptyQuest(): QuestData {
+export function emptyQuest(): QuestData {
   return { version: 1, sound: true, lessons: {}, xpByDay: {} }
+}
+
+export function isQuestData(v: unknown): v is QuestData {
+  if (typeof v !== 'object' || v === null) return false
+  const d = v as Record<string, unknown>
+  return (
+    d.version === 1 &&
+    typeof d.sound === 'boolean' &&
+    typeof d.lessons === 'object' &&
+    d.lessons !== null &&
+    typeof d.xpByDay === 'object' &&
+    d.xpByDay !== null
+  )
+}
+
+function normalizeQuest(data: QuestData): QuestData {
+  return { ...emptyQuest(), ...data, lessons: { ...data.lessons }, xpByDay: { ...data.xpByDay } }
 }
 
 function load(): QuestData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return emptyQuest()
-    const parsed = JSON.parse(raw) as Partial<QuestData> | null
-    if (!parsed || parsed.version !== 1 || typeof parsed.lessons !== 'object') return emptyQuest()
-    return { ...emptyQuest(), ...parsed }
+    const parsed: unknown = JSON.parse(raw)
+    if (!isQuestData(parsed)) return emptyQuest()
+    return normalizeQuest(parsed)
   } catch {
     return emptyQuest()
   }
+}
+
+export function mergeQuest(current: QuestData, incoming: QuestData): QuestData {
+  const lessons = { ...current.lessons }
+  for (const [key, inc] of Object.entries(incoming.lessons)) {
+    const cur = lessons[key]
+    lessons[key] = cur
+      ? { stars: Math.max(cur.stars, inc.stars) as 1 | 2 | 3, t: Math.max(cur.t, inc.t) }
+      : inc
+  }
+
+  const xpByDay = { ...current.xpByDay }
+  for (const [day, xp] of Object.entries(incoming.xpByDay)) {
+    xpByDay[day] = Math.max(xpByDay[day] ?? 0, xp)
+  }
+
+  return { version: 1, sound: current.sound, lessons, xpByDay }
 }
 
 class QuestStore {
@@ -161,6 +195,23 @@ class QuestStore {
 
   setSound(on: boolean) {
     this.commit({ ...this.data, sound: on })
+  }
+
+  replaceData(data: QuestData) {
+    this.commit(normalizeQuest(data))
+  }
+
+  resetDeck(deckId: string) {
+    const prefix = `${deckId}::`
+    const lessons: Record<string, LessonScore> = {}
+    for (const [key, score] of Object.entries(this.data.lessons)) {
+      if (!key.startsWith(prefix)) lessons[key] = score
+    }
+    this.commit({ ...this.data, lessons })
+  }
+
+  resetAll() {
+    this.commit(emptyQuest())
   }
 }
 

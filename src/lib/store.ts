@@ -13,12 +13,17 @@ export interface Settings {
   maxReviewsPerDay: number
 }
 
+export type LogMode = 'srs' | 'practice' | 'quest'
+export type NeutralAnswerMode = Exclude<LogMode, 'srs'>
+
 export interface LogEntry {
   t: number
   deck: string
   card: string
-  mode: 'srs' | 'practice'
+  mode: LogMode
   grade?: Grade
+  /** Quest lesson key for quest-mode answers. */
+  lesson?: string
   /** multiple-choice result; null when the answer was revealed without picking */
   correct: boolean | null
   ms?: number
@@ -157,11 +162,16 @@ class ProgressStore {
 
   /** Record a practice answer without touching the review schedule. */
   practice(deck: string, card: string, correct: boolean) {
+    this.recordAnswer(deck, card, correct, 'practice')
+  }
+
+  /** Record a schedule-neutral answer without touching SRS due dates. */
+  recordAnswer(deck: string, card: string, correct: boolean, mode: NeutralAnswerMode, opts: { lesson?: string; ms?: number } = {}) {
     const now = Date.now()
     const key = cardKey(deck, card)
     const prev = this.data.cards[key] ?? emptyProgress()
     const next: CardProgress = { ...prev, seen: prev.seen + 1, correct: prev.correct + (correct ? 1 : 0) }
-    const entry: LogEntry = { t: now, deck, card, mode: 'practice', correct }
+    const entry: LogEntry = { t: now, deck, card, mode, correct, lesson: opts.lesson, ms: opts.ms }
     this.undoData = null
     this.commit({
       ...this.data,

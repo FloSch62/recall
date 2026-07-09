@@ -23,8 +23,9 @@ import LightModeIcon from '@mui/icons-material/LightMode'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
 import { useColorScheme } from '@mui/material/styles'
-import { store, useProgress, DEFAULT_SETTINGS, emptyData, type ProgressData } from '../lib/store'
-import { exportProgress, mergeProgress, summarizeImport, type ImportSummary } from '../lib/importExport'
+import { store, useProgress, DEFAULT_SETTINGS, emptyData } from '../lib/store'
+import { emptyQuest, mergeQuest, questStore, useQuest } from '../lib/quest'
+import { exportProgress, mergeProgress, summarizeImport, type ImportFile, type ImportSummary } from '../lib/importExport'
 import { ConfirmDialog } from '../components/Feedback'
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -42,9 +43,10 @@ function SettingsSection({ title, children }: { title: string; children: React.R
 
 export default function SettingsPage() {
   const data = useProgress()
+  const quest = useQuest()
   const { mode, setMode } = useColorScheme()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [pendingImport, setPendingImport] = useState<{ data: ProgressData; summary: ImportSummary } | null>(null)
+  const [pendingImport, setPendingImport] = useState<{ file: ImportFile; summary: ImportSummary } | null>(null)
   const [snack, setSnack] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
 
@@ -61,15 +63,18 @@ export default function SettingsPage() {
 
   const applyImport = (mode: 'merge' | 'replace') => {
     if (!pendingImport) return
-    const incoming = pendingImport.data
+    const incoming = pendingImport.file.data
+    const incomingQuest = pendingImport.file.quest
     if (mode === 'merge') {
       store.replaceData(mergeProgress(store.getSnapshot(), incoming))
+      if (incomingQuest) questStore.replaceData(mergeQuest(questStore.getSnapshot(), incomingQuest))
     } else {
       store.replaceData({
         ...emptyData(),
         ...incoming,
         settings: { ...DEFAULT_SETTINGS, ...incoming.settings },
       })
+      questStore.replaceData(incomingQuest ?? emptyQuest())
     }
     setPendingImport(null)
     setSnack(mode === 'merge' ? 'Progress merged.' : 'Progress replaced.')
@@ -91,7 +96,7 @@ export default function SettingsPage() {
     />
   )
 
-  const storageKb = Math.max(1, Math.round(JSON.stringify(data).length / 1024))
+  const storageKb = Math.max(1, Math.round(JSON.stringify({ data, quest }).length / 1024))
 
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
@@ -128,11 +133,11 @@ export default function SettingsPage() {
 
         <SettingsSection title="Progress data">
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Your progress lives in this browser ({storageKb} KB, {data.log.length} review entries). Export it as a
+            Your progress lives in this browser ({storageKb} KB, {data.log.length} activity entries). Export it as a
             JSON file for backup or to move between devices, then import it on the other side.
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <Button variant="contained" startIcon={<FileDownloadIcon />} onClick={() => exportProgress(data)}>
+            <Button variant="contained" startIcon={<FileDownloadIcon />} onClick={() => exportProgress(data, quest)}>
               Export progress
             </Button>
             <Button variant="outlined" startIcon={<FileUploadIcon />} onClick={() => fileRef.current?.click()}>
@@ -167,14 +172,17 @@ export default function SettingsPage() {
           <DialogContentText component="div">
             <Typography variant="body2" sx={{ mb: 1 }}>
               The file contains <b>{pendingImport?.summary.cards}</b> tracked cards and{' '}
-              <b>{pendingImport?.summary.reviews}</b> review entries
+              <b>{pendingImport?.summary.reviews}</b> activity entries
+              {pendingImport?.summary.questLessons
+                ? `, plus ${pendingImport.summary.questLessons} completed Quest lessons and ${pendingImport.summary.questXp} XP`
+                : ''}
               {pendingImport?.summary.exportedAt
                 ? `, exported ${new Date(pendingImport.summary.exportedAt).toLocaleString()}`
                 : ''}
               .
             </Typography>
             <Alert severity="info" sx={{ mb: 0.5 }}>
-              <b>Merge</b> keeps the most-studied version of every card and combines review history — safe for syncing
+              <b>Merge</b> keeps the most-studied version of every card and combines activity history — safe for syncing
               two devices. <b>Replace</b> discards everything currently on this device.
             </Alert>
           </DialogContentText>
@@ -193,11 +201,12 @@ export default function SettingsPage() {
       <ConfirmDialog
         open={resetOpen}
         title="Reset all progress?"
-        message="This permanently deletes every review, schedule and statistic on this device. Export your progress first if you might want it back."
+        message="This permanently deletes every answer, review schedule, Quest lesson and statistic on this device. Export your progress first if you might want it back."
         confirmLabel="Delete everything"
         onClose={() => setResetOpen(false)}
         onConfirm={() => {
           store.resetAll()
+          questStore.resetAll()
           setSnack('All progress deleted.')
         }}
       />

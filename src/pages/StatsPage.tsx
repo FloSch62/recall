@@ -15,6 +15,7 @@ import { useColorScheme } from '@mui/material/styles'
 import { BarChart } from '@mui/x-charts/BarChart'
 import { getDeck, useDeckIndex } from '../lib/decks'
 import { useProgress } from '../lib/store'
+import { bestStreak, buildQuest, deckQuestTotals, levelFor, totalXp, useQuest } from '../lib/quest'
 import { DAY_MS, MATURE_IVL, startOfToday, todayKey } from '../lib/srs'
 import { moduleCounts } from '../lib/stats'
 import { formatPercent } from '../lib/format'
@@ -86,6 +87,7 @@ function StateBar({ items }: { items: { label: string; value: number; color: str
 export default function StatsPage() {
   const { index, error } = useDeckIndex()
   const data = useProgress()
+  const quest = useQuest()
   const { mode, systemMode } = useColorScheme()
   const dark = (mode === 'system' ? systemMode : mode) === 'dark'
   const C = dark ? CHART_COLORS.dark : CHART_COLORS.light
@@ -111,12 +113,12 @@ export default function StatsPage() {
   const sod = startOfToday(now)
 
   const computed = useMemo(() => {
-    const srsLog = data.log.filter((l) => l.mode === 'srs')
-    const attempts = data.log.filter((l) => l.correct !== null)
+    const activityLog = data.log
+    const attempts = activityLog.filter((l) => l.correct !== null)
     const correctAll = attempts.filter((l) => l.correct === true).length
 
     // streak
-    const days = new Set(srsLog.map((l) => todayKey(l.t)))
+    const days = new Set(activityLog.map((l) => todayKey(l.t)))
     let streak = 0
     const cursor = new Date(now)
     if (!days.has(todayKey(cursor.getTime()))) cursor.setDate(cursor.getDate() - 1)
@@ -137,14 +139,14 @@ export default function StatsPage() {
       labels.push(fmt.format(t))
       dayIndex.set(todayKey(t), i)
     }
-    for (const l of srsLog) {
+    for (const l of activityLog) {
       const i = dayIndex.get(todayKey(l.t))
       if (i === undefined) continue
       if (l.correct === true) correct[i]++
       else if (l.correct === false) wrong[i]++
       else noAnswer[i]++
     }
-    const reviews30 = correct.reduce((a, b) => a + b, 0) + wrong.reduce((a, b) => a + b, 0) + noAnswer.reduce((a, b) => a + b, 0)
+    const activity30 = correct.reduce((a, b) => a + b, 0) + wrong.reduce((a, b) => a + b, 0) + noAnswer.reduce((a, b) => a + b, 0)
 
     // 14-day due forecast (overdue folds into today)
     const forecastLabels: string[] = []
@@ -169,8 +171,8 @@ export default function StatsPage() {
 
     return {
       streak,
-      totalReviews: srsLog.length,
-      reviews30,
+      totalActivity: activityLog.length,
+      activity30,
       attempts: attempts.length,
       correctAll,
       labels,
@@ -186,12 +188,27 @@ export default function StatsPage() {
     }
   }, [data, sod, now])
 
+  const questSummary = useMemo(() => {
+    let total = 0
+    let done = 0
+    let perfect = 0
+    for (const deck of decks ?? []) {
+      const lessons = buildQuest(deck).flatMap((u) => u.lessons)
+      const totals = deckQuestTotals(quest, deck.id, lessons)
+      total += lessons.length
+      done += totals.done
+      perfect += totals.perfect
+    }
+    const xp = totalXp(quest)
+    return { xp, level: levelFor(xp), total, done, perfect, bestStreak: bestStreak(quest) }
+  }, [decks, quest])
+
   if (error) return <ErrorState message={error} />
   if (!index) return <Loading />
 
   const totalCards = index.decks.reduce((a, d) => a + d.cardCount, 0)
   const newCount = Math.max(0, totalCards - computed.started)
-  const hasAny = computed.totalReviews > 0 || computed.attempts > 0
+  const hasAny = computed.totalActivity > 0 || computed.attempts > 0 || questSummary.xp > 0
 
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
@@ -203,7 +220,7 @@ export default function StatsPage() {
         <Card sx={{ mb: 2 }}>
           <CardContent>
             <Typography color="text.secondary">
-              No study activity yet — stats appear after your first session.
+              No study activity yet — stats appear after your first answer.
             </Typography>
           </CardContent>
         </Card>
@@ -211,10 +228,10 @@ export default function StatsPage() {
 
       <Grid container spacing={1.5} sx={{ mb: 2 }}>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatTile value={`${computed.streak}d`} label="Streak" hint={computed.streak > 0 ? 'keep it going' : undefined} />
+          <StatTile value={`${computed.streak}d`} label="Activity streak" hint={computed.streak > 0 ? 'keep it going' : undefined} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
-          <StatTile value={String(computed.totalReviews)} label="Reviews" hint={`${computed.reviews30} in last 30 days`} />
+          <StatTile value={String(computed.totalActivity)} label="Activity" hint={`${computed.activity30} in last 30 days`} />
         </Grid>
         <Grid size={{ xs: 6, sm: 3 }}>
           <StatTile
@@ -228,10 +245,32 @@ export default function StatsPage() {
         </Grid>
       </Grid>
 
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        Quest progress
+      </Typography>
+      <Grid container spacing={1.5} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatTile
+            value={`Level ${questSummary.level.level}`}
+            label={questSummary.level.title}
+            hint={`${questSummary.xp} XP`}
+          />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatTile value={`${questSummary.done}/${questSummary.total}`} label="Lessons" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatTile value={String(questSummary.perfect)} label="Perfect lessons" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatTile value={`${questSummary.bestStreak}d`} label="Best Quest streak" />
+        </Grid>
+      </Grid>
+
       <Card sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Reviews per day — last 30 days
+            Activity per day — last 30 days
           </Typography>
           <BarChart
             height={260}
@@ -244,9 +283,9 @@ export default function StatsPage() {
               },
             ]}
             series={[
-              { data: computed.correct, label: 'Correct', stack: 'reviews', color: C.correct },
-              { data: computed.wrong, label: 'Incorrect', stack: 'reviews', color: C.wrong },
-              { data: computed.noAnswer, label: 'No answer', stack: 'reviews', color: C.noAnswer },
+              { data: computed.correct, label: 'Correct', stack: 'activity', color: C.correct },
+              { data: computed.wrong, label: 'Incorrect', stack: 'activity', color: C.wrong },
+              { data: computed.noAnswer, label: 'No answer', stack: 'activity', color: C.noAnswer },
             ]}
             grid={{ horizontal: true }}
             borderRadius={3}
@@ -317,12 +356,13 @@ function DeckModuleTable({ deck }: { deck: Deck }) {
           {deck.title}
         </Typography>
         <Box sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 480 }}>
+          <Table size="small" sx={{ minWidth: 560 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Module</TableCell>
                 <TableCell align="right">Cards</TableCell>
-                <TableCell align="right">Started</TableCell>
+                <TableCell align="right">Answered</TableCell>
+                <TableCell align="right">In SRS</TableCell>
                 <TableCell align="right">Mastered</TableCell>
                 <TableCell align="right">Accuracy</TableCell>
               </TableRow>
@@ -334,6 +374,7 @@ function DeckModuleTable({ deck }: { deck: Deck }) {
                   <TableRow key={title}>
                     <TableCell>{title}</TableCell>
                     <TableCell align="right">{m.total}</TableCell>
+                    <TableCell align="right">{m.answered}</TableCell>
                     <TableCell align="right">{m.started}</TableCell>
                     <TableCell align="right">{m.mature}</TableCell>
                     <TableCell align="right">{formatPercent(m.correct, m.seen)}</TableCell>

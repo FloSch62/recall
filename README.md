@@ -16,9 +16,9 @@ No account, no install. Your study progress and imported decks are stored in you
 - **Answer real multiple-choice questions** — pick an option, get instant feedback and an explanation. Accuracy is tracked separately from the schedule.
 - **See exhibits like in the real exam** — questions can include terminal output and auto-drawn network topology diagrams (spines, leaves, servers, LAG/eBGP links…).
 - **Practice without pressure** — cram mode with module filters, shuffle, "weakest first" and retry-wrong never touches your review schedule.
-- **Level up in Quest mode** — a Duolingo-style learning tree: bite-sized lessons with sounds and animations, missed questions repeat until you get them right, and stars, XP, levels, a daily goal and streaks keep you coming back. Like practice, it never touches your review schedule.
+- **Level up in Quest mode** — a Duolingo-style learning tree: bite-sized lessons with sounds and animations, missed questions repeat until you get them right, and stars, XP, levels, a daily goal and streaks keep you coming back. Quest answers count toward shared progress and accuracy, but never touch your review schedule.
 - **Browse and search** every question with module/state filters and per-card scheduling details.
-- **Keep your streak** — stats show reviews per day, a due forecast, card states and per-module accuracy.
+- **Keep your streak** — stats show activity per day, Quest progress, a due forecast, card states and per-module accuracy.
 
 <p align="center">
   <img src="docs/screenshots/home.png" alt="Deck overview" width="760">
@@ -46,7 +46,7 @@ Good to know:
 
 ## Track your progress
 
-Every answer feeds your statistics: streak, reviews per day, a 14-day due forecast and how many cards you've mastered. Back up or sync between devices with **Settings → Export / Import progress** (merge-aware, safe for two devices).
+Every answer feeds your statistics: streak, activity per day, Quest progress, a 14-day due forecast and how many cards you've mastered. Back up or sync between devices with **Settings → Export / Import progress** (merge-aware, safe for two devices).
 
 <p align="center">
   <img src="docs/screenshots/stats.png" alt="Statistics page" width="760">

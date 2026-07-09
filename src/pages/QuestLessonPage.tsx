@@ -406,7 +406,7 @@ function LessonRunner({ deckId, lesson }: { deckId: string; lesson: QuestLesson 
     const ok = key === current.answer
     if (!(current.id in firstTry)) {
       setFirstTry({ ...firstTry, [current.id]: ok })
-      store.practice(deckId, current.id, ok)
+      store.recordAnswer(deckId, current.id, ok, 'quest', { lesson: lesson.key })
     }
     if (ok) {
       sfx.correct()

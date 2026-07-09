@@ -22,6 +22,7 @@ import { useDeck } from '../lib/decks'
 import { deleteImportedDeck, describeSource, getImportedDeck, saveImportedDeck, useImportedVersion } from '../lib/importedDecks'
 import { refetchFromSource } from '../lib/importSource'
 import { store, useProgress } from '../lib/store'
+import { questStore } from '../lib/quest'
 import { deckCounts, moduleCounts, sessionEstimate } from '../lib/stats'
 import { formatPercent } from '../lib/format'
 import { ConfirmDialog, ErrorState, Loading } from '../components/Feedback'
@@ -93,13 +94,16 @@ export default function DeckPage() {
       )}
 
       <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-        <Grid size={{ xs: 4 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
+          <StatTile value={counts.answered} label="Answered" color="primary.main" />
+        </Grid>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatTile value={counts.newRemaining} label="New" color="info.main" />
         </Grid>
-        <Grid size={{ xs: 4 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatTile value={counts.learning} label="Learning" color="warning.main" />
         </Grid>
-        <Grid size={{ xs: 4 }}>
+        <Grid size={{ xs: 6, sm: 3 }}>
           <StatTile value={due} label="Due today" color="success.main" />
         </Grid>
       </Grid>
@@ -136,15 +140,15 @@ export default function DeckPage() {
       <Card sx={{ mb: 2.5 }}>
         <CardContent>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Overall progress
+            Shared progress
           </Typography>
           <LinearProgress
             variant="determinate"
-            value={counts.total ? (counts.started / counts.total) * 100 : 0}
+            value={counts.total ? (counts.answered / counts.total) * 100 : 0}
             sx={{ height: 8, borderRadius: 4, mb: 1 }}
           />
           <Typography variant="caption" color="text.secondary">
-            {counts.started}/{counts.total} started · {counts.mature} mastered · answer accuracy{' '}
+            {counts.answered}/{counts.total} answered · {counts.started} in SRS · {counts.mature} mastered · answer accuracy{' '}
             {formatPercent(counts.correct, counts.seen)}
           </Typography>
         </CardContent>
@@ -165,11 +169,11 @@ export default function DeckPage() {
                   </Typography>
                   <LinearProgress
                     variant="determinate"
-                    value={m.total ? (m.started / m.total) * 100 : 0}
+                    value={m.total ? (m.answered / m.total) * 100 : 0}
                     sx={{ height: 6, borderRadius: 3, mb: 0.25 }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    {m.started}/{m.total} started · {m.mature} mastered · accuracy {formatPercent(m.correct, m.seen)}
+                    {m.answered}/{m.total} answered · {m.started} in SRS · {m.mature} mastered · accuracy {formatPercent(m.correct, m.seen)}
                   </Typography>
                 </Box>
               )
@@ -213,10 +217,13 @@ export default function DeckPage() {
       <ConfirmDialog
         open={resetOpen}
         title="Reset deck progress?"
-        message={`This permanently removes all review history and scheduling for "${deck.title}". Consider exporting your progress first (Settings → Export).`}
+        message={`This permanently removes all answers, review history, scheduling and Quest lesson progress for "${deck.title}". Consider exporting your progress first (Settings → Export).`}
         confirmLabel="Reset deck"
         onClose={() => setResetOpen(false)}
-        onConfirm={() => store.resetDeck(deckId)}
+        onConfirm={() => {
+          store.resetDeck(deckId)
+          questStore.resetDeck(deckId)
+        }}
       />
     </Container>
   )

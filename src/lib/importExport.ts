@@ -1,14 +1,21 @@
 import { isProgressData, type LogEntry, type ProgressData } from './store'
+import { isQuestData, type QuestData } from './quest'
 import { todayKey } from './srs'
 
 export interface ExportFile {
   app: 'recall'
   exportedAt: string
   data: ProgressData
+  quest?: QuestData
 }
 
-export function exportProgress(data: ProgressData) {
-  const file: ExportFile = { app: 'recall', exportedAt: new Date().toISOString(), data }
+export interface ImportFile {
+  data: ProgressData
+  quest: QuestData | null
+}
+
+export function exportProgress(data: ProgressData, quest?: QuestData) {
+  const file: ExportFile = { app: 'recall', exportedAt: new Date().toISOString(), data, quest }
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -19,21 +26,20 @@ export function exportProgress(data: ProgressData) {
 }
 
 /** Accepts both the export wrapper and a raw ProgressData object. */
-export function parseImport(text: string): ProgressData {
+export function parseImport(text: string): ImportFile {
   let parsed: unknown
   try {
     parsed = JSON.parse(text)
   } catch {
     throw new Error('Not a valid JSON file.')
   }
-  const candidate =
-    typeof parsed === 'object' && parsed !== null && 'app' in parsed && (parsed as ExportFile).app === 'recall'
-      ? (parsed as ExportFile).data
-      : parsed
+  const wrapped = typeof parsed === 'object' && parsed !== null && 'app' in parsed && (parsed as ExportFile).app === 'recall'
+  const candidate = wrapped ? (parsed as ExportFile).data : parsed
   if (!isProgressData(candidate)) {
     throw new Error('This file does not look like a Recall progress export.')
   }
-  return candidate
+  const quest = wrapped && isQuestData((parsed as ExportFile).quest) ? (parsed as ExportFile).quest! : null
+  return { data: candidate, quest }
 }
 
 /**
@@ -82,11 +88,13 @@ export function mergeProgress(current: ProgressData, incoming: ProgressData): Pr
 export interface ImportSummary {
   cards: number
   reviews: number
+  questLessons: number
+  questXp: number
   exportedAt: string | null
 }
 
-export function summarizeImport(text: string): { data: ProgressData; summary: ImportSummary } {
-  const data = parseImport(text)
+export function summarizeImport(text: string): { file: ImportFile; summary: ImportSummary } {
+  const file = parseImport(text)
   let exportedAt: string | null = null
   try {
     const parsed = JSON.parse(text) as ExportFile
@@ -95,10 +103,12 @@ export function summarizeImport(text: string): { data: ProgressData; summary: Im
     // raw ProgressData without wrapper
   }
   return {
-    data,
+    file,
     summary: {
-      cards: Object.keys(data.cards).length,
-      reviews: data.log.length,
+      cards: Object.keys(file.data.cards).length,
+      reviews: file.data.log.length,
+      questLessons: file.quest ? Object.keys(file.quest.lessons).length : 0,
+      questXp: file.quest ? Object.values(file.quest.xpByDay).reduce((a, b) => a + b, 0) : 0,
       exportedAt,
     },
   }
