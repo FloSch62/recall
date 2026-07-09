@@ -2,6 +2,7 @@
   "name": "recall",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.3.0",
   "type": "module",
   "scripts": {
     "decks": "node scripts/build-decks.mjs",
