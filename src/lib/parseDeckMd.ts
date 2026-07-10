@@ -8,6 +8,8 @@
  *   intro paragraph(s)  -> description
  *   ## Module heading
  *   ### Page / section heading
+ *   ### Checkpoint stable-id — Reading checkpoint title
+ *   <!-- Sources: pages X–Y -->
  *   **Q16.1** Question text (may span lines, may contain ![exhibit](images/x.png) and/or
  *   fenced ```cli / ```topology exhibit blocks)
  *   - A. option
@@ -17,7 +19,8 @@
  *   </details>
  */
 import { marked } from 'marked'
-import type { Card, CardOption, Deck, DeckSummary, Exhibit, TopologySpec } from './types'
+import type { Card, CardOption, Checkpoint, Deck, DeckSummary, Exhibit, TopologySpec } from './types'
+import { checkpointAlignments } from './questStructure.ts'
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -34,6 +37,8 @@ const QUESTION_RE = /^\*\*(Q[^*]+)\*\*\s*(.*)$/
 const OPTION_RE = /^- ([A-Z])\.\s+(.*)$/
 const ANSWER_RE = /^\*\*([A-Z](?:\s*(?:,|and)\s*[A-Z])*)\*\*\s*[—–-]?\s*(.*)$/
 const FENCE_RE = /^```(\w*)\s*$/
+const CHECKPOINT_RE = /^### Checkpoint\s+([a-z0-9][a-z0-9-]*)\s+[—–-]\s+(.+)$/
+const CHECKPOINT_SOURCE_RE = /^<!--\s*Sources:\s*(.*?)\s*-->$/i
 
 const NODE_KINDS = new Set(['cloud', 'superspine', 'spine', 'leaf', 'server', 'host', 'router', 'vm'])
 const LINK_KINDS = new Set(['link', 'ebgp', 'lag', 'tunnel', 'down'])
@@ -105,6 +110,15 @@ interface PendingQuestion {
   expl: string[]
 }
 
+interface PendingCheckpoint {
+  id: string
+  title: string
+  body: string[]
+  sources: string
+  module: number
+  cardIndex: number
+}
+
 export interface ParsedDeck {
   deck: Deck
   problems: string[]
@@ -116,10 +130,12 @@ export function parseDeckMarkdown(deckId: string, md: string): ParsedDeck {
   const descLines: string[] = []
   const modules: string[] = []
   const cards: Card[] = []
+  const checkpointPositions: { checkpoint: Omit<Checkpoint, 'beforeCardId'>; cardIndex: number }[] = []
   const problems: string[] = []
 
   let page = ''
   let cur: PendingQuestion | null = null // question being accumulated
+  let checkpoint: PendingCheckpoint | null = null
   let inDetails = false
   let sawFirstModule = false
 
@@ -147,6 +163,27 @@ export function parseDeckMarkdown(deckId: string, md: string): ParsedDeck {
     cur = null
   }
 
+  const flushCheckpoint = () => {
+    if (!checkpoint) return
+    const body = checkpoint.body.join('\n').trim()
+    if (!checkpoint.title.trim()) problems.push(`Checkpoint ${checkpoint.id}: title is empty`)
+    if (!body) problems.push(`Checkpoint ${checkpoint.id}: body is empty`)
+    if (!checkpoint.sources) problems.push(`Checkpoint ${checkpoint.id}: no Sources comment found`)
+    if (checkpointPositions.some((p) => p.checkpoint.id === checkpoint!.id))
+      problems.push(`Checkpoint ${checkpoint.id}: duplicate id`)
+    checkpointPositions.push({
+      checkpoint: {
+        id: checkpoint.id,
+        title: checkpoint.title.trim(),
+        contentHtml: mdBlock(body),
+        sources: checkpoint.sources,
+        module: checkpoint.module,
+      },
+      cardIndex: checkpoint.cardIndex,
+    })
+    checkpoint = null
+  }
+
   let inFence = false
   for (const raw of lines) {
     const line = raw.trimEnd()
@@ -167,12 +204,34 @@ export function parseDeckMarkdown(deckId: string, md: string): ParsedDeck {
 
     if (line.startsWith('## ') && !line.startsWith('###')) {
       flush()
+      flushCheckpoint()
       modules.push(line.slice(3).trim())
       sawFirstModule = true
       continue
     }
+    if (line.startsWith('### Checkpoint')) {
+      flush()
+      flushCheckpoint()
+      const match = line.match(CHECKPOINT_RE)
+      const id = match?.[1] ?? `invalid-${checkpointPositions.length + 1}`
+      const title = match?.[2] ?? line.replace(/^### Checkpoint\s*/, '').trim()
+      if (!match)
+        problems.push(
+          `Malformed checkpoint heading "${line.slice(4)}"; expected "### Checkpoint stable-id — Title"`,
+        )
+      checkpoint = {
+        id,
+        title,
+        body: [],
+        sources: '',
+        module: Math.max(0, modules.length - 1),
+        cardIndex: cards.length,
+      }
+      continue
+    }
     if (line.startsWith('### ')) {
       flush()
+      flushCheckpoint()
       page = line.slice(4).trim()
       continue
     }
@@ -184,7 +243,19 @@ export function parseDeckMarkdown(deckId: string, md: string): ParsedDeck {
     const qm = line.match(QUESTION_RE)
     if (qm && !inDetails) {
       flush()
+      flushCheckpoint()
       cur = { id: qm[1], q: qm[2] ? [qm[2]] : [], options: [], answer: '', expl: [] }
+      continue
+    }
+
+    if (checkpoint) {
+      const source = line.match(CHECKPOINT_SOURCE_RE)
+      if (source) {
+        if (checkpoint.sources) problems.push(`Checkpoint ${checkpoint.id}: multiple Sources comments found`)
+        checkpoint.sources = source[1].trim()
+      } else {
+        checkpoint.body.push(line)
+      }
       continue
     }
 
@@ -228,16 +299,37 @@ export function parseDeckMarkdown(deckId: string, md: string): ParsedDeck {
     }
   }
   flush()
+  flushCheckpoint()
+
+  const checkpoints = checkpointPositions.map(({ checkpoint: value, cardIndex }): Checkpoint => ({
+    ...value,
+    beforeCardId: cards[cardIndex]?.id ?? null,
+  }))
+  const positions = new Set<number>()
+  for (const { checkpoint: value, cardIndex } of checkpointPositions) {
+    if (positions.has(cardIndex)) problems.push(`Checkpoint ${value.id}: another checkpoint uses the same position`)
+    positions.add(cardIndex)
+  }
 
   const description = descLines.join(' ').replace(/\s+/g, ' ').trim()
+  const deck: Deck = {
+    id: deckId,
+    title,
+    description: mdInline(description),
+    modules,
+    cards,
+    checkpoints,
+  }
+  for (const alignment of checkpointAlignments(deck)) {
+    if (!alignment.aligned)
+      problems.push(
+        `Checkpoint ${alignment.id}: anchor must be the first card of a Quest lesson${
+          alignment.lessonKey ? ` (${alignment.lessonKey})` : ''
+        }`,
+      )
+  }
   return {
-    deck: {
-      id: deckId,
-      title,
-      description: mdInline(description),
-      modules,
-      cards,
-    },
+    deck,
     problems,
   }
 }
@@ -250,6 +342,7 @@ export function summarizeDeck(deck: Deck): DeckSummary {
     cardCount: deck.cards.length,
     moduleCount: deck.modules.length,
     exhibitCount: deck.cards.filter((c) => c.exhibits.length > 0).length,
+    checkpointCount: deck.checkpoints?.length ?? 0,
   }
 }
 

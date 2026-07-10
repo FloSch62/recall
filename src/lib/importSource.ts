@@ -4,9 +4,10 @@
  * like a compiled deck.json is used directly, anything else is parsed as
  * questions.md markdown.
  */
-import type { Card, Deck } from './types'
+import type { Card, Checkpoint, Deck } from './types'
 // explicit .ts extension so Node can run this module too (build script / tests)
 import { parseDeckMarkdown, slugify } from './parseDeckMd.ts'
+import { checkpointAlignments } from './questStructure.ts'
 import type { DeckSource } from './importedDecks'
 
 export interface PreparedImport {
@@ -57,13 +58,48 @@ function deckFromJson(text: string): Deck {
     }
   })
   if (cards.length === 0) throw new Error('The deck contains no cards.')
-  return {
+  const cardIds = new Set(cards.map((card) => card.id))
+  const checkpointIds = new Set<string>()
+  const checkpoints = Array.isArray(d.checkpoints)
+    ? d.checkpoints.map((c, i): Checkpoint => {
+        const checkpoint = c as Partial<Checkpoint>
+        if (
+          typeof checkpoint.id !== 'string' ||
+          !/^[a-z0-9][a-z0-9-]*$/.test(checkpoint.id) ||
+          typeof checkpoint.title !== 'string' ||
+          !checkpoint.title.trim() ||
+          typeof checkpoint.contentHtml !== 'string' ||
+          !checkpoint.contentHtml.trim() ||
+          typeof checkpoint.sources !== 'string' ||
+          !checkpoint.sources.trim()
+        )
+          throw new Error(`Checkpoint ${i + 1} has an invalid id or is missing title, contentHtml or sources.`)
+        if (checkpointIds.has(checkpoint.id)) throw new Error(`Duplicate checkpoint id "${checkpoint.id}".`)
+        checkpointIds.add(checkpoint.id)
+        const beforeCardId = typeof checkpoint.beforeCardId === 'string' ? checkpoint.beforeCardId : null
+        if (beforeCardId && !cardIds.has(beforeCardId))
+          throw new Error(`Checkpoint "${checkpoint.id}" references unknown card "${beforeCardId}".`)
+        return {
+          id: checkpoint.id,
+          title: checkpoint.title,
+          contentHtml: checkpoint.contentHtml,
+          sources: typeof checkpoint.sources === 'string' ? checkpoint.sources : '',
+          module: typeof checkpoint.module === 'number' ? checkpoint.module : 0,
+          beforeCardId,
+        }
+      })
+    : []
+  const deck: Deck = {
     id: slugify(typeof d.id === 'string' ? d.id : d.title) || FALLBACK_ID,
     title: d.title,
     description: typeof d.description === 'string' ? d.description : '',
     modules: Array.isArray(d.modules) ? d.modules : [],
     cards,
+    checkpoints,
   }
+  const misaligned = checkpointAlignments(deck).find((alignment) => !alignment.aligned)
+  if (misaligned) throw new Error(`Checkpoint "${misaligned.id}" is not anchored to the start of a Quest lesson.`)
+  return deck
 }
 
 /**

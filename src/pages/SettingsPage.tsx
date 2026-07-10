@@ -173,8 +173,8 @@ export default function SettingsPage() {
             <Typography variant="body2" sx={{ mb: 1 }}>
               The file contains <b>{pendingImport?.summary.cards}</b> tracked cards and{' '}
               <b>{pendingImport?.summary.reviews}</b> activity entries
-              {pendingImport?.summary.questLessons
-                ? `, plus ${pendingImport.summary.questLessons} completed Quest lessons and ${pendingImport.summary.questXp} XP`
+              {pendingImport && (pendingImport.summary.questLessons || pendingImport.summary.questCheckpoints)
+                ? `, plus ${pendingImport.summary.questLessons} completed Quest lessons, ${pendingImport.summary.questCheckpoints} reading checkpoints and ${pendingImport.summary.questXp} XP`
                 : ''}
               {pendingImport?.summary.exportedAt
                 ? `, exported ${new Date(pendingImport.summary.exportedAt).toLocaleString()}`

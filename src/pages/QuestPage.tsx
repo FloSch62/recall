@@ -24,6 +24,7 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents'
 import VolumeUpIcon from '@mui/icons-material/VolumeUp'
 import VolumeOffIcon from '@mui/icons-material/VolumeOff'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import LightbulbRoundedIcon from '@mui/icons-material/LightbulbRounded'
 import { useDeck } from '../lib/decks'
 import { useProgress } from '../lib/store'
 import {
@@ -36,6 +37,7 @@ import {
   levelFor,
   questStore,
   questStreak,
+  questStepIsComplete,
   totalXp,
   useQuest,
   xpToday,
@@ -105,6 +107,7 @@ function PathDots({ from, to }: { from: number; to: number }) {
 
 interface NodeProps {
   state: 'done' | 'active' | 'locked'
+  kind: 'lesson' | 'checkpoint'
   colorIdx: number
   stars?: number
   offset: number
@@ -113,10 +116,10 @@ interface NodeProps {
   onClick: () => void
 }
 
-function LessonNode({ state, colorIdx, stars, offset, label, nodeRef, onClick }: NodeProps) {
+function PathNode({ state, kind, colorIdx, stars, offset, label, nodeRef, onClick }: NodeProps) {
   const color = UNIT_COLORS[colorIdx]
   const locked = state === 'locked'
-  const perfect = state === 'done' && stars === 3
+  const perfect = kind === 'lesson' && state === 'done' && stars === 3
   const restShadow = locked
     ? '0 6px 0 rgba(128, 128, 128, 0.35)'
     : perfect
@@ -161,7 +164,7 @@ function LessonNode({ state, colorIdx, stars, offset, label, nodeRef, onClick }:
         sx={{
           width: 72,
           height: 72,
-          borderRadius: '50%',
+          borderRadius: kind === 'checkpoint' ? 3 : '50%',
           color: '#fff',
           bgcolor: locked ? 'action.disabledBackground' : color.main,
           boxShadow: restShadow,
@@ -176,13 +179,38 @@ function LessonNode({ state, colorIdx, stars, offset, label, nodeRef, onClick }:
       >
         {locked ? (
           <LockIcon sx={{ color: 'text.disabled', fontSize: 30 }} />
+        ) : kind === 'checkpoint' ? (
+          <LightbulbRoundedIcon sx={{ fontSize: 38 }} />
         ) : state === 'done' ? (
           <CheckRoundedIcon sx={{ fontSize: 40 }} />
         ) : (
           <StarRoundedIcon sx={{ fontSize: 44 }} />
         )}
       </ButtonBase>
-      {state === 'done' && (
+      {state === 'done' && kind === 'checkpoint' && (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            right: -7,
+            bottom: -9,
+            zIndex: 1,
+            width: 25,
+            height: 25,
+            borderRadius: '50%',
+            display: 'grid',
+            placeItems: 'center',
+            bgcolor: 'background.paper',
+            color: color.main,
+            border: '2px solid',
+            borderColor: color.main,
+            boxShadow: '0 2px 0 rgba(0,0,0,0.14)',
+          }}
+        >
+          <CheckRoundedIcon sx={{ fontSize: 18 }} />
+        </Box>
+      )}
+      {state === 'done' && kind === 'lesson' && (
         <Stack
           direction="row"
           sx={{ position: 'absolute', bottom: -12, left: '50%', transform: 'translateX(-50%)' }}
@@ -312,7 +340,8 @@ export default function QuestPage() {
   if (!deck) return <Loading />
 
   const flat = units.flatMap((u) => u.lessons)
-  const firstOpen = flat.findIndex((l) => !lessonScore(data, deckId, l.key))
+  const flatSteps = units.flatMap((u) => u.steps)
+  const firstOpen = flatSteps.findIndex((step) => !questStepIsComplete(data, deckId, step))
   const allDone = firstOpen === -1
   const now = Date.now()
   const streak = questStreak(data, now)
@@ -331,7 +360,7 @@ export default function QuestPage() {
   let acc = 0
   for (const u of units) {
     unitStart.push(acc)
-    acc += u.lessons.length
+    acc += u.steps.length
   }
 
   return (
@@ -480,22 +509,28 @@ export default function QuestPage() {
                 </Typography>
                 <Typography sx={{ fontWeight: 800, fontSize: 17 }}>{u.title}</Typography>
               </Box>
-              {u.lessons.map((l, li) => {
-                const gi = unitStart[ui] + li
-                const score = lessonScore(data, deckId, l.key)
-                const state: NodeProps['state'] = score ? 'done' : gi === firstOpen ? 'active' : 'locked'
+              {u.steps.map((step, si) => {
+                const gi = unitStart[ui] + si
+                const score = step.type === 'lesson' ? lessonScore(data, deckId, step.key) : undefined
+                const complete = questStepIsComplete(data, deckId, step)
+                const state: NodeProps['state'] = complete ? 'done' : gi === firstOpen ? 'active' : 'locked'
+                const label =
+                  step.type === 'lesson'
+                    ? `${u.title} — lesson ${step.index + 1} (${step.cards.length} questions)`
+                    : `${u.title} — checkpoint: ${step.checkpoint.title}`
                 return (
                   <Box
-                    key={l.key}
+                    key={step.key}
                     sx={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
                   >
-                    {li > 0 && <PathDots from={OFFSETS[(gi - 1) % OFFSETS.length]} to={OFFSETS[gi % OFFSETS.length]} />}
-                    <LessonNode
+                    {si > 0 && <PathDots from={OFFSETS[(gi - 1) % OFFSETS.length]} to={OFFSETS[gi % OFFSETS.length]} />}
+                    <PathNode
                       state={state}
+                      kind={step.type}
                       colorIdx={ui % UNIT_COLORS.length}
                       stars={score?.stars}
                       offset={OFFSETS[gi % OFFSETS.length]}
-                      label={`${u.title} — lesson ${li + 1} (${l.cards.length} questions)`}
+                      label={label}
                       nodeRef={state === 'active' ? activeRef : undefined}
                       onClick={() => {
                         if (state === 'locked') {
@@ -503,7 +538,11 @@ export default function QuestPage() {
                           return
                         }
                         sfx.tap()
-                        navigate(`/deck/${deckId}/quest/${u.module}/${l.index}`)
+                        navigate(
+                          step.type === 'lesson'
+                            ? `/deck/${deckId}/quest/${u.module}/${step.index}`
+                            : `/deck/${deckId}/quest/checkpoint/${encodeURIComponent(step.checkpoint.id)}`,
+                        )
                       }}
                     />
                   </Box>
@@ -554,7 +593,7 @@ export default function QuestPage() {
         open={lockedOpen}
         autoHideDuration={2500}
         onClose={() => setLockedOpen(false)}
-        message="Complete the previous lessons to unlock this one!"
+        message="Complete the previous path step to unlock this one!"
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
     </Container>

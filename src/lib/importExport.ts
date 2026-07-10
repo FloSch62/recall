@@ -89,6 +89,7 @@ export interface ImportSummary {
   cards: number
   reviews: number
   questLessons: number
+  questCheckpoints: number
   questXp: number
   exportedAt: string | null
 }
@@ -108,6 +109,7 @@ export function summarizeImport(text: string): { file: ImportFile; summary: Impo
       cards: Object.keys(file.data.cards).length,
       reviews: file.data.log.length,
       questLessons: file.quest ? Object.keys(file.quest.lessons).length : 0,
+      questCheckpoints: file.quest ? Object.keys(file.quest.checkpoints ?? {}).length : 0,
       questXp: file.quest ? Object.values(file.quest.xpByDay).reduce((a, b) => a + b, 0) : 0,
       exportedAt,
     },

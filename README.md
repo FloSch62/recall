@@ -16,7 +16,7 @@ No account or install required. On Android Chrome, you can install Recall from t
 - **Answer real multiple-choice questions** — pick an option, get instant feedback and an explanation. Accuracy is tracked separately from the schedule.
 - **See exhibits like in the real exam** — questions can include terminal output and auto-drawn network topology diagrams (spines, leaves, servers, LAG/eBGP links…).
 - **Practice without pressure** — cram mode with module filters, shuffle, "weakest first" and retry-wrong never touches your review schedule.
-- **Level up in Quest mode** — a Duolingo-style learning tree: bite-sized lessons with sounds and animations, missed questions repeat until you get them right, and stars, XP, levels, a daily goal and streaks keep you coming back. Quest answers count toward shared progress and accuracy, but never touch your review schedule.
+- **Level up in Quest mode** — a Duolingo-style learning tree: summary checkpoints teach essential concepts before bite-sized question lessons, missed questions repeat until you get them right, and stars, XP, levels, a daily goal and streaks keep you coming back. Quest answers count toward shared progress and accuracy, but never touch your review schedule.
 - **Browse and search** every question with module/state filters and per-card scheduling details.
 - **Keep your streak** — stats show activity per day, Quest progress, a due forecast, card states and per-module accuracy.
 
@@ -82,6 +82,29 @@ acknowledgements, no retransmission, no ordering.
 
 </details>
 ```
+
+Quest-only summary checkpoints can be placed before a question that starts a Quest lesson. Their
+stable IDs preserve completion when a deck is updated, and the source comment keeps authored
+teaching material auditable without displaying it to learners:
+
+```markdown
+### Checkpoint routing-foundations — Connect the control plane to forwarding
+
+<!-- Sources: pages 30–38 -->
+
+#### Essentials
+- The underlay provides routed reachability between tunnel endpoints.
+- BGP distributes reachability without extending a Layer 2 failure domain.
+
+#### Key takeaway
+VXLAN carries overlay traffic, while EVPN supplies the control-plane reachability that makes forwarding efficient.
+```
+
+Checkpoints appear only in Quest mode. Each one teaches the essential concepts exercised by the
+question lesson immediately after it and ends with a short conclusion. Completing one unlocks the
+next path step but awards no XP, stars, accuracy, or streak credit. Put each checkpoint immediately
+before the first question of an existing lesson; the deck validator reports anchors that would
+otherwise fall inside a lesson.
 
 Exhibits go inside the question body as fenced code blocks:
 

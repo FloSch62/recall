@@ -67,7 +67,12 @@ let loadPromise: Promise<void> | null = null
 export function ensureLoaded(): Promise<void> {
   loadPromise ??= withStore('readonly', (s) => s.getAll() as IDBRequest<ImportedDeck[]>)
     .then((all) => {
-      records = new Map(all.map((r) => [r.id, r]))
+      records = new Map(
+        all.map((r) => [
+          r.id,
+          { ...r, deck: { ...r.deck, checkpoints: Array.isArray(r.deck.checkpoints) ? r.deck.checkpoints : [] } },
+        ]),
+      )
     })
     .catch(() => {
       // IndexedDB unavailable (private mode, storage denied) — run without imports

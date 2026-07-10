@@ -8,6 +8,20 @@ template for building your own decks, or import decks from a URL on the Import p
 
 ### Ethernet frames
 
+### Checkpoint networking-start — Build your packet-forwarding mental model
+
+<!-- Sources: Module 1 questions Q1.1–Q1.5 -->
+
+#### Essentials
+
+- Ethernet delivers frames inside a local broadcast domain. A MAC address is 48 bits, and the all-ones destination address reaches every station in that domain.
+- An IPv4 host uses its subnet mask to decide whether a destination is local. Remote traffic is sent to a default gateway, and longest-prefix matching selects the most specific route.
+- ARP resolves a local IPv4 address to a MAC address. UDP, by contrast, is a transport protocol that provides no delivery, ordering, or flow-control guarantee.
+
+#### Key takeaway
+
+Ethernet handles local frame delivery, IP chooses the routed destination, and ARP supplies the Layer 2 address needed for the next local hop.
+
 **Q1.1** How long is a MAC address?
 
 - A. 32 bits

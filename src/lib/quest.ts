@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import { DAY_MS, todayKey } from './srs'
-import type { Card, Deck } from './types'
+import { DAY_MS, todayKey } from './srs.ts'
+import type { QuestCheckpoint, QuestLesson, QuestStep } from './questStructure.ts'
+export { buildQuest, LESSON_SIZE } from './questStructure.ts'
+export type { CheckpointAlignment, QuestCheckpoint, QuestLesson, QuestStep, QuestUnit } from './questStructure.ts'
 
-/** Target questions per lesson; module remainders are spread evenly. */
-export const LESSON_SIZE = 8
 export const LESSON_XP = 10
 export const PERFECT_BONUS = 5
 export const DAILY_GOAL_XP = 30
@@ -47,42 +47,6 @@ export function levelFor(xp: number): LevelInfo {
   }
 }
 
-export interface QuestLesson {
-  /** stable within a deck: `u<module>-l<index>` */
-  key: string
-  unit: number
-  index: number
-  cards: Card[]
-}
-
-export interface QuestUnit {
-  module: number
-  title: string
-  lessons: QuestLesson[]
-}
-
-/** Split a deck into Duolingo-style units (one per module) of small lessons. */
-export function buildQuest(deck: Deck): QuestUnit[] {
-  const byModule = new Map<number, Card[]>()
-  for (const card of deck.cards) {
-    const list = byModule.get(card.module) ?? []
-    list.push(card)
-    byModule.set(card.module, list)
-  }
-  const units: QuestUnit[] = []
-  for (const [module, cards] of [...byModule.entries()].sort((a, b) => a[0] - b[0])) {
-    const count = Math.max(1, Math.ceil(cards.length / LESSON_SIZE))
-    const lessons: QuestLesson[] = []
-    for (let i = 0; i < count; i++) {
-      const start = Math.round((i * cards.length) / count)
-      const end = Math.round(((i + 1) * cards.length) / count)
-      lessons.push({ key: `u${module}-l${i}`, unit: module, index: i, cards: cards.slice(start, end) })
-    }
-    units.push({ module, title: deck.modules[module] ?? `Module ${module + 1}`, lessons })
-  }
-  return units
-}
-
 export function starsFor(firstTryCorrect: number, total: number): 1 | 2 | 3 {
   if (total > 0 && firstTryCorrect === total) return 3
   if (total > 0 && firstTryCorrect / total >= 0.7) return 2
@@ -95,11 +59,18 @@ export interface LessonScore {
   t: number
 }
 
+export interface CheckpointCompletion {
+  /** Epoch ms of the first explicit completion. */
+  t: number
+}
+
 export interface QuestData {
   version: 1
   sound: boolean
   /** keyed by `${deckId}::${lessonKey}` */
   lessons: Record<string, LessonScore>
+  /** keyed by `${deckId}::${checkpointId}` */
+  checkpoints: Record<string, CheckpointCompletion>
   /** local YYYY-MM-DD -> XP earned that day */
   xpByDay: Record<string, number>
 }
@@ -107,7 +78,7 @@ export interface QuestData {
 const STORAGE_KEY = 'recall:quest:v1'
 
 export function emptyQuest(): QuestData {
-  return { version: 1, sound: true, lessons: {}, xpByDay: {} }
+  return { version: 1, sound: true, lessons: {}, checkpoints: {}, xpByDay: {} }
 }
 
 export function isQuestData(v: unknown): v is QuestData {
@@ -118,13 +89,20 @@ export function isQuestData(v: unknown): v is QuestData {
     typeof d.sound === 'boolean' &&
     typeof d.lessons === 'object' &&
     d.lessons !== null &&
+    (d.checkpoints === undefined || (typeof d.checkpoints === 'object' && d.checkpoints !== null)) &&
     typeof d.xpByDay === 'object' &&
     d.xpByDay !== null
   )
 }
 
 function normalizeQuest(data: QuestData): QuestData {
-  return { ...emptyQuest(), ...data, lessons: { ...data.lessons }, xpByDay: { ...data.xpByDay } }
+  return {
+    ...emptyQuest(),
+    ...data,
+    lessons: { ...data.lessons },
+    checkpoints: { ...(data.checkpoints ?? {}) },
+    xpByDay: { ...data.xpByDay },
+  }
 }
 
 function load(): QuestData {
@@ -148,12 +126,18 @@ export function mergeQuest(current: QuestData, incoming: QuestData): QuestData {
       : inc
   }
 
+  const checkpoints = { ...current.checkpoints }
+  for (const [key, inc] of Object.entries(incoming.checkpoints ?? {})) {
+    const cur = checkpoints[key]
+    checkpoints[key] = cur ? { t: Math.max(cur.t, inc.t) } : inc
+  }
+
   const xpByDay = { ...current.xpByDay }
   for (const [day, xp] of Object.entries(incoming.xpByDay)) {
     xpByDay[day] = Math.max(xpByDay[day] ?? 0, xp)
   }
 
-  return { version: 1, sound: current.sound, lessons, xpByDay }
+  return { version: 1, sound: current.sound, lessons, checkpoints, xpByDay }
 }
 
 class QuestStore {
@@ -193,6 +177,15 @@ class QuestStore {
     })
   }
 
+  completeCheckpoint(deckId: string, checkpointId: string, now: number) {
+    const key = `${deckId}::${checkpointId}`
+    if (this.data.checkpoints[key]) return
+    this.commit({
+      ...this.data,
+      checkpoints: { ...this.data.checkpoints, [key]: { t: now } },
+    })
+  }
+
   setSound(on: boolean) {
     this.commit({ ...this.data, sound: on })
   }
@@ -207,7 +200,11 @@ class QuestStore {
     for (const [key, score] of Object.entries(this.data.lessons)) {
       if (!key.startsWith(prefix)) lessons[key] = score
     }
-    this.commit({ ...this.data, lessons })
+    const checkpoints: Record<string, CheckpointCompletion> = {}
+    for (const [key, completion] of Object.entries(this.data.checkpoints)) {
+      if (!key.startsWith(prefix)) checkpoints[key] = completion
+    }
+    this.commit({ ...this.data, lessons, checkpoints })
   }
 
   resetAll() {
@@ -223,6 +220,28 @@ export function useQuest(): QuestData {
 
 export function lessonScore(data: QuestData, deckId: string, lessonKey: string): LessonScore | undefined {
   return data.lessons[`${deckId}::${lessonKey}`]
+}
+
+export function checkpointCompletion(
+  data: QuestData,
+  deckId: string,
+  checkpointId: string,
+): CheckpointCompletion | undefined {
+  return data.checkpoints[`${deckId}::${checkpointId}`]
+}
+
+/** Explicit completion, or an inferred migration completion when the following lesson predates checkpoints. */
+export function checkpointIsComplete(data: QuestData, deckId: string, step: QuestCheckpoint): boolean {
+  return Boolean(
+    checkpointCompletion(data, deckId, step.checkpoint.id) ||
+      (step.followingLessonKey && lessonScore(data, deckId, step.followingLessonKey)),
+  )
+}
+
+export function questStepIsComplete(data: QuestData, deckId: string, step: QuestStep): boolean {
+  return step.type === 'lesson'
+    ? Boolean(lessonScore(data, deckId, step.key))
+    : checkpointIsComplete(data, deckId, step)
 }
 
 export function totalXp(data: QuestData): number {

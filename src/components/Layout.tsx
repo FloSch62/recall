@@ -30,7 +30,9 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   // study, practice & quest lessons are immersive: hide the bottom nav so the answer bar owns the bottom edge
-  const immersive = /\/(study|practice)$/.test(location.pathname) || /\/quest\/\d+\/\d+$/.test(location.pathname)
+  const immersive =
+    /\/(study|practice)$/.test(location.pathname) ||
+    /\/quest\/(?:\d+\/\d+|checkpoint\/[^/]+)$/.test(location.pathname)
   const value = navValue(location.pathname)
 
   return (

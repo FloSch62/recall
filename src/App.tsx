@@ -7,6 +7,7 @@ import StudyPage from './pages/StudyPage'
 import PracticePage from './pages/PracticePage'
 import QuestPage from './pages/QuestPage'
 import QuestLessonPage from './pages/QuestLessonPage'
+import QuestCheckpointPage from './pages/QuestCheckpointPage'
 import BrowsePage from './pages/BrowsePage'
 import ImportPage from './pages/ImportPage'
 import SettingsPage from './pages/SettingsPage'
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="deck/:deckId/study" element={<StudyPage />} />
         <Route path="deck/:deckId/practice" element={<PracticePage />} />
         <Route path="deck/:deckId/quest" element={<QuestPage />} />
+        <Route path="deck/:deckId/quest/checkpoint/:checkpointId" element={<QuestCheckpointPage />} />
         <Route path="deck/:deckId/quest/:unit/:lesson" element={<QuestLessonPage />} />
         <Route path="deck/:deckId/browse" element={<BrowsePage />} />
         <Route

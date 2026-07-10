@@ -31,7 +31,7 @@ function main() {
     const summary = summarizeDeck(deck)
     index.push(summary)
     console.log(
-      `✓ ${entry}: ${summary.cardCount} cards, ${summary.moduleCount} modules, ${summary.exhibitCount} with exhibits`,
+      `✓ ${entry}: ${summary.cardCount} cards, ${summary.moduleCount} modules, ${summary.exhibitCount} with exhibits, ${summary.checkpointCount} checkpoints`,
     )
     for (const p of problems) console.warn(`  ⚠ ${p}`)
   }

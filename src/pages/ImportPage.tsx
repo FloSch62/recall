@@ -78,6 +78,7 @@ function DeckPreview({ prepared, onDone }: { prepared: PreparedImport; onDone: (
         <Stack direction="row" spacing={1} sx={{ my: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}>
           <Chip size="small" label={`${deck.cards.length} questions`} />
           <Chip size="small" label={`${deck.modules.length} modules`} />
+          {deck.checkpoints.length > 0 && <Chip size="small" label={`${deck.checkpoints.length} checkpoints`} />}
           <Chip size="small" label={`${exhibitCount} with exhibits`} />
         </Stack>
 
