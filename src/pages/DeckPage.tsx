@@ -18,9 +18,23 @@ import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline'
 import SyncIcon from '@mui/icons-material/Sync'
 import Chip from '@mui/material/Chip'
 import Snackbar from '@mui/material/Snackbar'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
+import TextField from '@mui/material/TextField'
 import { useDeck } from '../lib/decks'
-import { deleteImportedDeck, describeSource, getImportedDeck, saveImportedDeck, useImportedVersion } from '../lib/importedDecks'
+import {
+  deleteImportedDeck,
+  describeSource,
+  getImportedDeck,
+  saveImportedDeck,
+  sourceNeedsGithubToken,
+  useImportedVersion,
+} from '../lib/importedDecks'
 import { refetchFromSource } from '../lib/importSource'
+import { GithubApiError } from '../lib/github'
+import { clearGithubToken, getGithubToken, setGithubToken } from '../lib/githubAuth'
 import { store, useProgress } from '../lib/store'
 import { questStore } from '../lib/quest'
 import { deckCounts, moduleCounts, sessionEstimate } from '../lib/stats'
@@ -52,24 +66,46 @@ export default function DeckPage() {
   const [removeOpen, setRemoveOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [snack, setSnack] = useState<string | null>(null)
+  const [tokenDialogOpen, setTokenDialogOpen] = useState(false)
+  const [tokenDraft, setTokenDraft] = useState('')
   const importedVersion = useImportedVersion()
   const imported = useMemo(() => getImportedDeck(deckId), [deckId, importedVersion])
 
   const counts = useMemo(() => (deck ? deckCounts(deck, data, Date.now()) : null), [deck, data])
   const modules = useMemo(() => (deck ? moduleCounts(deck, data) : []), [deck, data])
 
-  const updateFromSource = async () => {
+  const updateFromSourceWithToken = async (token: string) => {
     if (!imported || imported.source.type === 'manual') return
     setUpdating(true)
+    setTokenDialogOpen(false)
+    setGithubToken(token)
     try {
-      const prep = await refetchFromSource(imported.source)
-      await saveImportedDeck({ ...prep.deck, id: deckId }, imported.source)
+      const prep = await refetchFromSource(imported.source, token)
+      await saveImportedDeck({ ...prep.deck, id: deckId }, prep.source)
       setSnack(`Deck updated from source (${prep.deck.cards.length} questions).`)
     } catch (e) {
+      if (
+        sourceNeedsGithubToken(imported.source) &&
+        e instanceof GithubApiError &&
+        (e.status === 401 || e.status === 403 || e.status === 404)
+      )
+        clearGithubToken()
       setSnack(e instanceof Error ? e.message : 'Update failed.')
     } finally {
       setUpdating(false)
     }
+  }
+
+  const updateFromSource = () => {
+    if (!imported || imported.source.type === 'manual') return
+    const needsToken = sourceNeedsGithubToken(imported.source)
+    const token = needsToken ? getGithubToken() : ''
+    if (needsToken && !token) {
+      setTokenDraft('')
+      setTokenDialogOpen(true)
+      return
+    }
+    void updateFromSourceWithToken(token)
   }
 
   if (error) return <ErrorState message={error} />
@@ -184,7 +220,7 @@ export default function DeckPage() {
 
       <Stack direction="row" spacing={1} sx={{ mt: 3, justifyContent: 'flex-end', flexWrap: 'wrap', rowGap: 1 }}>
         {imported && imported.source.type !== 'manual' && (
-          <Button size="small" startIcon={<SyncIcon />} disabled={updating} onClick={() => void updateFromSource()}>
+          <Button size="small" startIcon={<SyncIcon />} disabled={updating} onClick={updateFromSource}>
             {updating ? 'Updating…' : 'Update from source'}
           </Button>
         )}
@@ -214,6 +250,34 @@ export default function DeckPage() {
         message={snack ?? ''}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
+      <Dialog open={tokenDialogOpen} onClose={() => setTokenDialogOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Access private GitHub source</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Enter a fine-grained token with read-only Contents access to update this deck. Recall keeps it only in
+            memory until reload or close.
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Fine-grained GitHub token"
+            type="password"
+            value={tokenDraft}
+            onChange={(event) => setTokenDraft(event.target.value)}
+            slotProps={{ htmlInput: { autoComplete: 'off', spellCheck: false } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTokenDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={!tokenDraft.trim()}
+            onClick={() => void updateFromSourceWithToken(tokenDraft.trim())}
+          >
+            Update deck
+          </Button>
+        </DialogActions>
+      </Dialog>
       <ConfirmDialog
         open={resetOpen}
         title="Reset deck progress?"

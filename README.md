@@ -31,7 +31,7 @@ Recall ships with a small example deck. The interesting part is importing your o
 | Method | How |
 |---|---|
 | 📋 **Paste / file** | Paste `questions.md` content or load a local `.md` / `.json` file |
-| 🐙 **GitHub** | Paste a link to a repo, folder or file — e.g. `https://github.com/user/repo/tree/main/decks/my-deck`. Recall finds the `questions.md` on the default branch |
+| 🐙 **GitHub** | Paste a link to a repo, folder or file. Recall discovers every `questions.md` / `deck.json` below that location and lets you import one or more decks |
 | 🔗 **URL** | Any direct link to a `questions.md` or compiled `deck.json` (the server must allow CORS — raw.githubusercontent.com and most static hosts do) |
 
 <p align="center">
@@ -43,6 +43,10 @@ Good to know:
 - Imported decks live in your browser (IndexedDB). You can **update them from their source** or remove them on the deck page.
 - Progress is keyed by deck ID + question ID — re-importing or updating a deck with the same ID **keeps your study progress**.
 - Image exhibits are loaded relative to the source URL, so decks imported from GitHub/URL can include images.
+- Private GitHub repositories work with a fine-grained personal access token scoped to the repository with
+  **Contents: read** permission. Recall keeps the token only in memory: it is never written to browser storage,
+  deck records or progress exports, and must be entered again after a reload. Relative private-repository images
+  are copied into the imported deck so they continue to work without the token.
 
 ## Track your progress
 

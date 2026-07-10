@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import Box from '@mui/material/Box'
 import type { SxProps, Theme } from '@mui/material/styles'
+import { sanitizeDeckHtml } from '../lib/sanitizeHtml'
 
 interface Props {
   html: string
@@ -8,6 +10,7 @@ interface Props {
 
 /** Renders build-time-sanitized deck HTML (escaped + markdown-rendered by scripts/build-decks.mjs). */
 export default function MarkdownHtml({ html, sx }: Props) {
+  const safeHtml = useMemo(() => sanitizeDeckHtml(html), [html])
   return (
     <Box
       sx={[
@@ -19,7 +22,7 @@ export default function MarkdownHtml({ html, sx }: Props) {
         },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: safeHtml }}
     />
   )
 }

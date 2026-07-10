@@ -6,12 +6,25 @@
  */
 import { useSyncExternalStore } from 'react'
 import type { Deck, DeckSummary } from './types'
-import { summarizeDeck } from './parseDeckMd'
+import { summarizeDeck } from './parseDeckMd.ts'
+
+export interface GithubDeckSourceV2 {
+  type: 'github'
+  version: 2
+  url: string
+  owner: string
+  repo: string
+  ref: string
+  path: string
+  visibility: 'public' | 'private'
+}
 
 export type DeckSource =
   | { type: 'manual' }
   | { type: 'url'; url: string }
-  | { type: 'github'; url: string; rawUrl: string }
+  | GithubDeckSourceV2
+  /** Records created before authenticated GitHub imports stored only a raw URL. */
+  | { type: 'github'; version?: undefined; url: string; rawUrl: string }
 
 export interface ImportedDeck {
   id: string
@@ -48,6 +61,56 @@ function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => 
   })
 }
 
+function putAll(items: ImportedDeck[]): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open(DB_NAME, 1)
+    open.onupgradeneeded = () => {
+      if (!open.result.objectStoreNames.contains(DB_STORE)) open.result.createObjectStore(DB_STORE, { keyPath: 'id' })
+    }
+    open.onerror = () => reject(open.error ?? new Error('Could not open the deck database.'))
+    open.onsuccess = () => {
+      const db = open.result
+      const tx = db.transaction(DB_STORE, 'readwrite')
+      const store = tx.objectStore(DB_STORE)
+      for (const item of items) store.put(item)
+      tx.oncomplete = () => {
+        db.close()
+        resolve()
+      }
+      tx.onerror = () => {
+        db.close()
+        reject(tx.error ?? new Error('Deck database transaction failed.'))
+      }
+      tx.onabort = () => {
+        db.close()
+        reject(tx.error ?? new Error('Deck database transaction aborted.'))
+      }
+    }
+  })
+}
+
+function migrateSource(source: DeckSource): DeckSource {
+  if (source.type !== 'github' || source.version === 2) return source
+  try {
+    const raw = new URL(source.rawUrl)
+    if (raw.hostname !== 'raw.githubusercontent.com') return source
+    const [owner, repo, ref, ...path] = raw.pathname.split('/').filter(Boolean).map(decodeURIComponent)
+    if (!owner || !repo || !ref || path.length === 0) return source
+    return {
+      type: 'github',
+      version: 2,
+      url: source.url,
+      owner,
+      repo,
+      ref,
+      path: path.join('/'),
+      visibility: 'public',
+    }
+  } catch {
+    return source
+  }
+}
+
 let records = new Map<string, ImportedDeck>()
 let loaded = false
 let version = 0
@@ -70,7 +133,11 @@ export function ensureLoaded(): Promise<void> {
       records = new Map(
         all.map((r) => [
           r.id,
-          { ...r, deck: { ...r.deck, checkpoints: Array.isArray(r.deck.checkpoints) ? r.deck.checkpoints : [] } },
+          {
+            ...r,
+            source: migrateSource(r.source),
+            deck: { ...r.deck, checkpoints: Array.isArray(r.deck.checkpoints) ? r.deck.checkpoints : [] },
+          },
         ]),
       )
     })
@@ -92,19 +159,25 @@ export function getImportedDeck(id: string): ImportedDeck | undefined {
 
 /** Save (or replace, keeping the original import date) an imported deck. */
 export async function saveImportedDeck(deck: Deck, source: DeckSource): Promise<ImportedDeck> {
+  const [saved] = await saveImportedDecks([{ deck, source }])
+  return saved
+}
+
+/** Save a group of decks atomically, rebuilding subscribers only after every write succeeds. */
+export async function saveImportedDecks(items: Array<{ deck: Deck; source: DeckSource }>): Promise<ImportedDeck[]> {
   await ensureLoaded()
   const now = Date.now()
-  const rec: ImportedDeck = {
+  const saved = items.map(({ deck, source }): ImportedDeck => ({
     id: deck.id,
     deck,
     source,
     importedAt: records.get(deck.id)?.importedAt ?? now,
     updatedAt: now,
-  }
-  await withStore('readwrite', (s) => s.put(rec))
-  records.set(rec.id, rec)
+  }))
+  await putAll(saved)
+  for (const rec of saved) records.set(rec.id, rec)
   rebuild()
-  return rec
+  return saved
 }
 
 export async function deleteImportedDeck(id: string): Promise<void> {
@@ -116,12 +189,27 @@ export async function deleteImportedDeck(id: string): Promise<void> {
 
 /** Base URL that relative image paths in an imported deck resolve against. */
 export function sourceBaseUrl(source: DeckSource): string | null {
-  const url = source.type === 'github' ? source.rawUrl : source.type === 'url' ? source.url : null
+  const url =
+    source.type === 'github'
+      ? source.version === 2
+        ? source.visibility === 'private'
+          ? null
+          : `https://raw.githubusercontent.com/${[source.owner, source.repo, source.ref, ...source.path.split('/')]
+              .map(encodeURIComponent)
+              .join('/')}`
+        : source.rawUrl
+      : source.type === 'url'
+        ? source.url
+        : null
   return url ? url.slice(0, url.lastIndexOf('/') + 1) : null
 }
 
 export function describeSource(source: DeckSource): string {
   return source.type === 'manual' ? 'pasted / local file' : source.url
+}
+
+export function sourceNeedsGithubToken(source: DeckSource): boolean {
+  return source.type === 'github' && source.version === 2 && source.visibility === 'private'
 }
 
 const subscribe = (fn: () => void) => {
